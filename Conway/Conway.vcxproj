@@ -128,10 +128,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Chunk.hpp" />
-    <ClInclude Include="V2i.h" />
+    <ClInclude Include="V2i.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Chunk.cpp" />
+    <ClCompile Include="game.cpp" />
     <ClCompile Include="V2i.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -15,11 +15,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Chunk.hpp">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="V2i.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="V2i.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="Chunk.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -27,6 +27,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Chunk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
