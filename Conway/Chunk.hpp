@@ -1,13 +1,16 @@
-#pragma once
+#ifndef _CHUNK_HPP_
+#define _CHUNK_HPP_
 
 #include <vector>
 #include "V2i.hpp"
 
+class ChunkRenderer;
 class Chunk;
 using Cell = bool;
-inline Cell invert_cell(Cell a) { return !a; }
+//inline Cell invert_cell(Cell a) { return !a; }
 
-using ChunkQueue = std::vector<Chunk*>*;
+//using ChunkQueue = std::vector<Chunk*>;
+using ChunkQueuer = void (*)(Chunk*);
 
 #define CELL_ALIVE true
 #define CELL_DEAD false
@@ -27,18 +30,17 @@ private:
 	std::vector<V2i> update1;
 
 public:
-	Chunk(int x, int y, ChunkQueue global_chunk_queue);
-	Chunk(const V2i& pos, ChunkQueue global_chunk_queue);
+	Chunk(int x, int y, ChunkRenderer* global_chunk_queue);
+	Chunk(const V2i& pos, ChunkRenderer* global_chunk_queue);
 
 	bool BACKBUFFER;
-	ChunkQueue global_chunk_update_queue;
+	ChunkRenderer* owner;
 
 private:
 	void add_to_update_buffer(const V2i& pos, std::vector<V2i>& buffer);
-	void update_adjacent(const V2i& vec, Chunk* neighbors[8]);
 	void update_correct_chunk(const V2i& vec, Chunk* neighbors[8]);
-
 public:
+	void update_adjacent(const V2i& vec, Chunk* neighbors[8]);
 	int get_neighbor_count(const V2i& pos, Chunk* neighbors[8]);
 	void execute_update(Chunk* neighbors[8]);
 	void clear_update_lists();
@@ -56,3 +58,5 @@ public:
 
 	static int v2itoindex(const V2i& v2i);
 };
+
+#endif
