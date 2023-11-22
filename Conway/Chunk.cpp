@@ -3,26 +3,27 @@
 #include "ChunkRenderer.hpp"
 
 Chunk::Chunk(int x, int y, ChunkRenderer* parent) : Chunk(V2i(x, y), parent) { }
-Chunk::Chunk(const V2i& pos, ChunkRenderer* parent) : chunk_position(pos), update0(), update1(), owner(parent)
+Chunk::Chunk(const V2i& pos, ChunkRenderer* parent) : chunk_position(pos), update0(), update1(), owner(parent), alive_count(0)
 {
 	memset(cells0, 0, CHUNK_SIZE * sizeof(Cell));
 	memset(cells1, 0, CHUNK_SIZE * sizeof(Cell));
-	BACKBUFFER = false;
+	//BACKBUFFER = false;
 }
 
+
+#include <iostream>
 
 void Chunk::execute_update(Chunk* neighbors[8])
 {
 	/// yada yada
 	//std::cout << "Chunk " << position() << ": update0{" << update0.size() << "}, update1{" << update1.size() << "}" << std::endl;
-
+	bool BACKBUFFER = owner->backbuffer();
 	Cell* fromBuffer = (BACKBUFFER) ? cells0 : cells1;
 	Cell* toBuffer = (BACKBUFFER) ? cells1 : cells0;
 	memcpy(toBuffer, fromBuffer, CHUNK_SIZE * sizeof(Cell));
 
 	std::vector<V2i>& toExec = (BACKBUFFER) ? update0 : update1;
 	std::vector<V2i>& toUpdate = (BACKBUFFER) ? update1 : update0;
-	toUpdate.clear();
 
 	for (const V2i& vec : toExec)
 	{
@@ -44,10 +45,31 @@ void Chunk::execute_update(Chunk* neighbors[8])
 
 		if (cell != newValue)
 		{
+			update_alive_count(newValue);
+			if (chunk_position == V2i(0, 0))
+			{
+				std::cout << "Original alive_count is now " << alive_count << std::endl;
+			}
 			toBuffer[index] = newValue;
 			update_adjacent(vec, neighbors);
 		}
 	}
+
+	toExec.clear();
+
+}
+
+bool Chunk::tick_for_should_die()
+{
+	if (alive_count < -10)
+	{
+		return true;
+	}
+	else if (alive_count <= 0)
+	{
+		alive_count--;
+	}
+	return false;
 }
 
 void Chunk::clear_update_lists()
@@ -66,7 +88,7 @@ void Chunk::add_to_update_buffer(const V2i& pos, std::vector<V2i>& buffer)
 
 void Chunk::add_to_update_list(const V2i& pos)
 {
-	std::vector<V2i>& updates = (BACKBUFFER) ? update1 : update0;
+	std::vector<V2i>& updates = (owner->backbuffer()) ? update1 : update0;
 	add_to_update_buffer(pos, updates);
 	//std::cout << "added update " << pos << " to buffer, size=" << updates.size() << std::endl;
 	owner->queue_update(this);
@@ -117,21 +139,21 @@ static V2i get_neighbor_offset(NeighborValue neighbor_index)
 	switch (neighbor_index)
 	{
 	case TL: // TOP LEFT
-		return V2i(CHUNK_DIMENSION, CHUNK_DIMENSION);
+		return V2i(1, 1);
 	case L: // LEFT
-		return V2i(CHUNK_DIMENSION, 0);
+		return V2i(1, 0);
 	case BL: // BOTTOM LEFT
-		return V2i(CHUNK_DIMENSION, -CHUNK_DIMENSION);
+		return V2i(1, -1);
 	case T: // TOP
-		return V2i(0, CHUNK_DIMENSION);
+		return V2i(0, 1);
 	case B: // BOTTOM
-		return V2i(0, -CHUNK_DIMENSION);
+		return V2i(0, -1);
 	case TR: // TOP RIGHT
-		return V2i(-CHUNK_DIMENSION, CHUNK_DIMENSION);
+		return V2i(1, 1);
 	case R: // RIGHT
-		return V2i(-CHUNK_DIMENSION, 0);
+		return V2i(-1, 0);
 	case BR: // BOTTOM RIGHT
-		return V2i(-CHUNK_DIMENSION, -CHUNK_DIMENSION);
+		return V2i(-1, -1);
 	case -1:
 	default:
 		return V2i();
@@ -161,7 +183,7 @@ int Chunk::get_neighbor_count(const V2i& pos, Chunk* neighbors[8])
 				if (neighbors[nv] == nullptr)
 					continue;
 
-				V2i offset_pos = np + get_neighbor_offset(nv);
+				V2i offset_pos = np + (get_neighbor_offset(nv) * CHUNK_DIMENSION);
 				Chunk* ch = neighbors[nv];
 
 				value = ch->get_pixel_c(offset_pos);
@@ -186,10 +208,14 @@ void Chunk::update_correct_chunk(const V2i& vec, Chunk* neighbors[8])
 	}
 
 	NeighborValue neighbor = get_chunk_neighbor_value(vec);
-	V2i offset = get_neighbor_offset(neighbor);
+	V2i offset = get_neighbor_offset(neighbor) * CHUNK_DIMENSION;
 
 	Chunk* ch = neighbors[neighbor];
-	if (ch == nullptr) return;
+	if (ch == nullptr)
+	{
+		ch = owner->add_chunk(position() - get_neighbor_offset(neighbor));
+		neighbors[neighbor] = ch;
+	}
 
 	ch->add_to_update_list(vec + offset);
 }
@@ -209,15 +235,30 @@ void Chunk::update_adjacent(const V2i& vec, Chunk* neighbors[8])
 void Chunk::toggle_pixel(const V2i& pos)
 {
 	Cell& cell = get_pixel(pos);
-	if (cell == CELL_ALIVE) 
+	if (cell == CELL_ALIVE)
 		cell = CELL_DEAD;
 	else cell = CELL_ALIVE;
 }
 
 void Chunk::set_pixel(const V2i& pos, Cell c)
 {
-	get_pixel(pos) = c;
-	
+	Cell& pixel = get_pixel(pos);
+	if (pixel == c) return;
+	update_alive_count(c);
+	pixel = c;
+}
+
+void Chunk::update_alive_count(Cell value)
+{
+	if (value == CELL_ALIVE)
+	{
+		if (alive_count < 0) alive_count = 0;
+		alive_count++;
+	}
+	else
+	{
+		alive_count--;
+	}
 }
 
 V2i Chunk::pixel_to_world_pos(const V2i& pixel) const
@@ -227,13 +268,13 @@ V2i Chunk::pixel_to_world_pos(const V2i& pixel) const
 
 Cell& Chunk::get_pixel(const V2i& v2i)
 {
-	Cell* cells = (BACKBUFFER) ? cells0 : cells1;
+	Cell* cells = (owner->backbuffer()) ? cells0 : cells1;
 	return cells[v2itoindex(v2i)];
 }
 
 Cell Chunk::get_pixel_c(const V2i& v2i) const
 {
-	const Cell* cells = (BACKBUFFER) ? cells0 : cells1;
+	const Cell* cells = (owner->backbuffer()) ? cells0 : cells1;
 	return cells[v2itoindex(v2i)];
 }
 

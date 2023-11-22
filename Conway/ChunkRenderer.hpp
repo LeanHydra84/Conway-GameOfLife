@@ -25,19 +25,24 @@ private:
 
 	Vector2 _center;
 	float _scale;
-	bool backbuffer;
+	bool _backbuffer;
 
 private:
 	ch_hash_t v2i_hashkey(const V2i& v2i) const;
 	bool cull_chunk(const Vector2& corner) const;
 	void render_chunk(const Vector2& corner, Chunk* chunk) const;
 	void get_neighbors(const V2i& center, Chunk* buffer[8]) const;
+	void delete_chunk_by_hash(ch_hash_t hash);
 public:
+	bool backbuffer() const;
+
 	void execute_updates();
 	void queue_update(Chunk* chunk);
 
 	bool does_chunk_exist(const V2i& v2i) const;
 	Chunk* add_chunk(const V2i& v2i);
+	void delete_chunk(const V2i& v2i);
+	void free_unused();
 
 	Cell get_cell_global(const V2i& v2i) const;
 	void set_cell_global(const V2i& v2i, Cell value);

@@ -3,10 +3,11 @@
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
 
+#define DEBUG_SHOW_CHUNK_BORDERS 0
 #define SQUARE_PIXEL_SCALE 16
 
 ChunkRenderer::ChunkRenderer(const RenderData* _data) : chunks(), _center(),
-_scale(1), data(_data), backbuffer(false)
+_scale(1), data(_data), _backbuffer(false)
 {
 	flip_backbuffer();
 }
@@ -67,12 +68,25 @@ void ChunkRenderer::set_scale(float scale)
 Chunk* ChunkRenderer::add_chunk(const V2i& v2i)
 {
 	Chunk* newchunk = new Chunk(v2i, this);
-	newchunk->BACKBUFFER = backbuffer;
+	//newchunk->BACKBUFFER = _backbuffer;
 
 	ch_hash_t hashkey = v2i_hashkey(v2i);
 	chunks[hashkey] = newchunk;
 
 	return newchunk;
+}
+
+void ChunkRenderer::delete_chunk(const V2i& v2i)
+{
+	ch_hash_t chunkhash = v2i_hashkey(v2i);
+	delete_chunk_by_hash(chunkhash);
+}
+
+void ChunkRenderer::delete_chunk_by_hash(ch_hash_t chunkhash)
+{
+	Chunk* chunk = chunks.at(chunkhash);
+	chunks.erase(chunkhash);
+	delete chunk;
 }
 
 Cell ChunkRenderer::get_cell_global(const V2i& v2i) const
@@ -116,9 +130,9 @@ void ChunkRenderer::queue_cell_update_global(const V2i& v2i)
 	get_neighbors(ch->position(), neighbors);
 	
 	// janky hack
-	ch->BACKBUFFER = !ch->BACKBUFFER;
+	_backbuffer = !_backbuffer;
 	ch->update_adjacent(interior, neighbors);
-	ch->BACKBUFFER = !ch->BACKBUFFER;
+	_backbuffer = !_backbuffer;
 }
 
 void ChunkRenderer::render() const
@@ -138,8 +152,11 @@ void ChunkRenderer::render() const
 
 void ChunkRenderer::render_chunk(const Vector2& corner, Chunk* chunk) const
 {
+#if DEBUG_SHOW_CHUNK_BORDERS
 	float chunk_edge = (CHUNK_DIMENSION * SQUARE_PIXEL_SCALE) * _scale;
 	al_draw_filled_rectangle(corner.x, corner.y, corner.x + chunk_edge, corner.y + chunk_edge, data->InactiveColor);
+	al_draw_rectangle(corner.x, corner.y, corner.x + chunk_edge, corner.y + chunk_edge, data->LineColor, 2);
+#endif
 
 	float square_size = SQUARE_PIXEL_SCALE * _scale;
 	for (int i = 0; i < CHUNK_DIMENSION; i++)
@@ -149,7 +166,7 @@ void ChunkRenderer::render_chunk(const Vector2& corner, Chunk* chunk) const
 			V2i chindex = V2i(i, j);
 			if (chunk->get_pixel_c(chindex) == CELL_DEAD)
 				continue;
-			Vector2 sqrbase = (chindex * SQUARE_PIXEL_SCALE) + corner;
+			Vector2 sqrbase = (chindex * square_size) + corner;
 			al_draw_filled_rectangle(sqrbase.x, sqrbase.y, sqrbase.x + square_size, sqrbase.y + square_size, data->ActiveColor);
 		}
 	}
@@ -189,6 +206,8 @@ void ChunkRenderer::execute_updates()
 		chunk->execute_update(nbuffer);
 	}
 
+	flip_backbuffer();
+	free_unused();
 }
 
 void ChunkRenderer::queue_update(Chunk* chunk)
@@ -216,11 +235,38 @@ void ChunkRenderer::get_neighbors(const V2i& center, Chunk* buffer[8]) const
 
 void ChunkRenderer::flip_backbuffer()
 {
-	backbuffer = !backbuffer;
+	_backbuffer = !_backbuffer;
+	//for (auto& kv : chunks)
+	//{
+	//	kv.second->BACKBUFFER = _backbuffer;
+	//}
+}
+
+void ChunkRenderer::free_unused()
+{
+	std::vector<ch_hash_t> tofree;
 	for (auto& kv : chunks)
 	{
-		kv.second->BACKBUFFER = backbuffer;
+		bool tokill = kv.second->tick_for_should_die();
+		if (tokill)
+		{
+			tofree.push_back(kv.first);
+		}
 	}
+
+	for (ch_hash_t hash : tofree)
+	{
+		delete_chunk_by_hash(hash);
+		if (update_queue.find(hash) == update_queue.end())
+		{
+			update_queue.erase(hash);
+		}
+	}
+}
+
+bool ChunkRenderer::backbuffer() const
+{
+	return _backbuffer;
 }
 
 V2i ChunkRenderer::screen_position_to_normalized_cell(V2i mpos) const

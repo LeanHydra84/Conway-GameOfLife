@@ -10,6 +10,7 @@ struct RenderData
 	size_t Height;
 	ALLEGRO_COLOR ActiveColor;
 	ALLEGRO_COLOR InactiveColor;
+	ALLEGRO_COLOR LineColor;
 };
 
 #endif

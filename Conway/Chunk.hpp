@@ -29,17 +29,20 @@ private:
 	std::vector<V2i> update0;
 	std::vector<V2i> update1;
 
+	int16_t alive_count;
 public:
 	Chunk(int x, int y, ChunkRenderer* global_chunk_queue);
 	Chunk(const V2i& pos, ChunkRenderer* global_chunk_queue);
 
-	bool BACKBUFFER;
+	//bool BACKBUFFER;
 	ChunkRenderer* owner;
 
 private:
 	void add_to_update_buffer(const V2i& pos, std::vector<V2i>& buffer);
 	void update_correct_chunk(const V2i& vec, Chunk* neighbors[8]);
+	void update_alive_count(Cell value);
 public:
+	bool tick_for_should_die();
 	void update_adjacent(const V2i& vec, Chunk* neighbors[8]);
 	int get_neighbor_count(const V2i& pos, Chunk* neighbors[8]);
 	void execute_update(Chunk* neighbors[8]);
@@ -48,7 +51,6 @@ public:
 
 	void toggle_pixel(const V2i& pos);
 	void set_pixel(const V2i& pos, Cell c);
-
 
 	Cell& get_pixel(const V2i& v2i); // returns nonconst reference type
 	Cell get_pixel_c(const V2i& v2i) const; // returns const value type
